@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oliver's Letter & Number Adventure!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* --- Mobile Browser Optimizations --- */
+            -webkit-tap-highlight-color: transparent; /* Disable tap highlight on iOS/Android */
+            user-select: none; /* Prevent text selection on long press */
+            touch-action: manipulation; /* Disable double-tap to zoom on interactive elements */
+        }
+        .font-playful {
+            font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
+        }
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        #item-card { 
+            transition: background-color 0.5s ease, color 0.5s ease;
+        }
+        #next-button {
+            transition: background-color 0.5s ease, color 0.5s ease; 
+        }
+        #next-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        #welcome-emoji {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+        #emoji-display {
+            line-height: 1.2; 
+            word-break: break-all; 
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-sky-300 via-emerald-200 to-yellow-300 min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden">
+
+    <div id="welcome-screen" class="text-center p-6 sm:p-8 bg-white/90 backdrop-blur-lg rounded-xl shadow-2xl max-w-lg mx-auto">
+        <span id="welcome-emoji" role="img" aria-label="Friendly boy">🧒</span>
+        <h1 class="text-4xl sm:text-5xl font-bold text-purple-600 mb-4 font-playful">Hi Oliver!</h1>
+        <p class="text-xl sm:text-2xl text-gray-700 mb-8">Let's learn Letters and Numbers!</p>
+        <button id="start-game-button" class="w-full sm:w-auto px-8 py-4 bg-pink-500 text-white text-xl sm:text-2xl font-semibold rounded-lg shadow-lg hover:bg-pink-600 transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-opacity-75">
+            Let's Go!
+        </button>
+    </div>
+
+    <div id="game-area" class="hidden flex-col items-center justify-center text-center p-4 sm:p-6 bg-white/90 backdrop-blur-lg rounded-xl shadow-2xl max-w-md w-full">
+        <div id="item-card" class="mb-4 sm:mb-6 p-6 sm:p-8 rounded-lg shadow-lg w-full">
+            <div id="main-display" class="text-8xl sm:text-9xl font-bold"></div> <!-- Initial content set by JS -->
+            <p id="item-info" class="text-xl sm:text-2xl mt-2 font-semibold"></p> <!-- Initial content set by JS -->
+            <div id="emoji-display" class="text-6xl sm:text-7xl mt-3"></div> <!-- Initial content set by JS -->
+        </div>
+
+        <img id="theme-image" src="https://placehold.co/300x200/CCCCCC/FFFFFF?text=Get+Ready!" alt="Theme Image" class="w-full max-w-xs h-auto rounded-lg shadow-md mb-4 sm:mb-6 object-cover border-4 border-white">
+        
+        <p id="error-message" class="text-red-500 text-sm mt-2 mb-2"></p>
+        
+        <button id="next-button" class="w-full mt-4 px-6 py-3 sm:py-4 text-xl sm:text-2xl font-semibold rounded-lg shadow-lg hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2">
+            Awesome! Next!
+        </button>
+    </div>
+
+    <canvas id="confetti-canvas"></canvas>
+    <audio id="elevenlabs-audio-player" style="display: none;"></audio>
+
+    <script>
+        // --- ElevenLabs Configuration ---
+        const ELEVENLABS_API_KEY = 'sk_7a88ed34ac412aabd79ad7a33ead3219498d98264415f42b';
+        const ELEVENLABS_VOICE_ID = 'TX3LPaxmHKxFdv7VOQHJ';
+        const ELEVENLABS_MODEL_ID = 'eleven_turbo_v2';
+
+        // --- Game Data (Letters & Numbers) ---
+        const gameItems = [
+            // Letters
+            { type: 'letter', letter: 'A', word: 'Allosaurus', emoji: '🦖', sound: 'ah, as in apple', theme: 'dinosaur', imgColor: '4CAF50', bgColor: 'bg-green-500', textColor: 'text-green-50' },
+            { type: 'letter', letter: 'B', word: 'Big Blue Truck', emoji: '🚚', sound: 'buh, as in ball', theme: 'truck', imgColor: '2196F3', bgColor: 'bg-blue-500', textColor: 'text-blue-50' },
+            { type: 'letter', letter: 'C', word: 'Castle Dragon', emoji: '🐉', sound: 'kuh, as in cat', theme: 'dragon', imgColor: 'FF9800', bgColor: 'bg-orange-500', textColor: 'text-orange-50' },
+            { type: 'letter', letter: 'D', word: 'Dump Truck', emoji: '🚛', sound: 'duh, as in dog', theme: 'truck', imgColor: 'F44336', bgColor: 'bg-red-500', textColor: 'text-red-50' },
+            { type: 'letter', letter: 'E', word: 'Excavator', emoji: '🚧', sound: 'eh, as in egg', theme: 'truck', imgColor: 'FFC107', bgColor: 'bg-yellow-500', textColor: 'text-yellow-800' },
+            { type: 'letter', letter: 'F', word: 'Friendly Fire Truck', emoji: '🚒', sound: 'fff, as in fish', theme: 'truck', imgColor: 'FF5722', bgColor: 'bg-deep-orange-500', textColor: 'text-deep-orange-50' },
+            { type: 'letter', letter: 'G', word: 'Green Dinosaur', emoji: '🦖', sound: 'guh, as in goat', theme: 'dinosaur', imgColor: '8BC34A', bgColor: 'bg-lime-500', textColor: 'text-lime-50' },
+            { type: 'letter', letter: 'H', word: 'Helicopter', emoji: '🚁', sound: 'huh, as in hat', theme: 'vehicle', imgColor: '00BCD4', bgColor: 'bg-cyan-500', textColor: 'text-cyan-50' },
+            { type: 'letter', letter: 'I', word: 'Ice Cream', emoji: '🍦', sound: 'ih, as in igloo', theme: 'food', imgColor: 'E91E63', bgColor: 'bg-pink-500', textColor: 'text-pink-50' },
+            { type: 'letter', letter: 'J', word: 'Jumping Jeep', emoji: '🚙', sound: 'juh, as in jam', theme: 'truck', imgColor: '673AB7', bgColor: 'bg-deep-purple-500', textColor: 'text-deep-purple-50' },
+            { type: 'letter', letter: 'K', word: 'Kite', emoji: '🪁', sound: 'kuh, as in kite', theme: 'toy', imgColor: '795548', bgColor: 'bg-brown-500', textColor: 'text-brown-50' },
+            { type: 'letter', letter: 'L', word: 'Long Dino', emoji: '🦕', sound: 'luh, as in lion', theme: 'dinosaur', imgColor: 'CDDC39', bgColor: 'bg-lime-600', textColor: 'text-lime-50' },
+            { type: 'letter', letter: 'M', word: 'Muddy Monster Truck', emoji: '🚜', sound: 'mmm, as in moon', theme: 'truck', imgColor: '009688', bgColor: 'bg-teal-500', textColor: 'text-teal-50' },
+            { type: 'letter', letter: 'N', word: 'Narwhal', emoji: '🐳', sound: 'nnn, as in nose', theme: 'animal', imgColor: '3F51B5', bgColor: 'bg-indigo-500', textColor: 'text-indigo-50' },
+            { type: 'letter', letter: 'O', word: 'Orange Ball', emoji: '🟠', sound: 'o, as in octopus', theme: 'toy', imgColor: 'FF9800', bgColor: 'bg-orange-600', textColor: 'text-orange-50' },
+            { type: 'letter', letter: 'P', word: 'Parrot', emoji: '🦜', sound: 'puh, as in pig', theme: 'animal', imgColor: '9C27B0', bgColor: 'bg-purple-500', textColor: 'text-purple-50' },
+            { type: 'letter', letter: 'Q', word: 'Queen', emoji: '👑', sound: 'kwuh, as in queen', theme: 'fantasy', imgColor: 'F06292', bgColor: 'bg-pink-400', textColor: 'text-pink-50' },
+            { type: 'letter', letter: 'R', word: 'Roaring Raptor', emoji: '🦖', sound: 'ruh, as in run', theme: 'dinosaur', imgColor: 'D32F2F', bgColor: 'bg-red-700', textColor: 'text-red-50' },
+            { type: 'letter', letter: 'S', word: 'Sparky the Dragon', emoji: '�', sound: 'sss, as in sun', theme: 'dragon', imgColor: 'FFEB3B', bgColor: 'bg-yellow-400', textColor: 'text-yellow-800' },
+            { type: 'letter', letter: 'T', word: 'Terrific T-Rex', emoji: '🦖', sound: 'tuh, as in tiger', theme: 'dinosaur', imgColor: 'E91E63', bgColor: 'bg-pink-600', textColor: 'text-pink-50' },
+            { type: 'letter', letter: 'U', word: 'UFO', emoji: '🛸', sound: 'uh, as in umbrella', theme: 'fantasy', imgColor: '4FC3F7', bgColor: 'bg-light-blue-400', textColor: 'text-light-blue-50' },
+            { type: 'letter', letter: 'V', word: 'Volcano', emoji: '🌋', sound: 'vvv, as in van', theme: 'nature', imgColor: '5E35B1', bgColor: 'bg-deep-purple-600', textColor: 'text-deep-purple-50' },
+            { type: 'letter', letter: 'W', word: 'Winged Dragon', emoji: '🐲', sound: 'wuh, as in watch', theme: 'dragon', imgColor: '0288D1', bgColor: 'bg-light-blue-700', textColor: 'text-light-blue-50' },
+            { type: 'letter', letter: 'X', word: 'X-Ray Fish', emoji: '🐟', sound: 'ks, as in box', theme: 'animal', imgColor: 'BDBDBD', bgColor: 'bg-gray-400', textColor: 'text-gray-800' },
+            { type: 'letter', letter: 'Y', word: 'Yellow Boat', emoji: '⛵', sound: 'yuh, as in yo-yo', theme: 'vehicle', imgColor: 'FFEE58', bgColor: 'bg-yellow-300', textColor: 'text-yellow-800' },
+            { type: 'letter', letter: 'Z', word: 'Zebra', emoji: '🦓', sound: 'zzz, as in zoo', theme: 'animal', imgColor: '757575', bgColor: 'bg-gray-600', textColor: 'text-gray-50' },
+            // Numbers
+            { type: 'number', number: '0', word: 'Zero Stars', emoji: '🚫✨', sound: "Zero means none, like no stars here!", theme: 'counting', imgColor: '9E9E9E', bgColor: 'bg-gray-500', textColor: 'text-gray-50' },
+            { type: 'number', number: '1', word: 'One Sun', emoji: '☀️', sound: "One means a single thing, like one big sun!", theme: 'counting', imgColor: 'FFEB3B', bgColor: 'bg-yellow-400', textColor: 'text-yellow-800' },
+            { type: 'number', number: '2', word: 'Two Shoes', emoji: '👟👟', sound: "Two means a pair, like two shoes for your feet! One, two!", theme: 'counting', imgColor: '795548', bgColor: 'bg-brown-500', textColor: 'text-brown-50' },
+            { type: 'number', number: '3', word: 'Three Balloons', emoji: '🎈🎈🎈', sound: "Three means this many: one, two, three balloons!", theme: 'counting', imgColor: 'F44336', bgColor: 'bg-red-500', textColor: 'text-red-50' },
+            { type: 'number', number: '4', word: 'Four Cars', emoji: '🚗🚗🚗🚗', sound: "Four means this many: one, two, three, four cars!", theme: 'counting', imgColor: '2196F3', bgColor: 'bg-blue-500', textColor: 'text-blue-50' },
+            { type: 'number', number: '5', word: 'Five Ducks', emoji: '🦆🦆🦆🦆🦆', sound: "Five means this many: one, two, three, four, five ducks!", theme: 'counting', imgColor: 'FF9800', bgColor: 'bg-orange-500', textColor: 'text-orange-50' },
+            { type: 'number', number: '6', word: 'Six Blocks', emoji: '🧱🧱🧱🧱🧱🧱', sound: "Six means this many: one, two, three, four, five, six blocks!", theme: 'counting', imgColor: '4CAF50', bgColor: 'bg-green-500', textColor: 'text-green-50' },
+            { type: 'number', number: '7', word: 'Seven Apples', emoji: '🍎🍎🍎🍎🍎🍎🍎', sound: "Seven means this many: one, two, three, four, five, six, seven apples!", theme: 'counting', imgColor: 'E91E63', bgColor: 'bg-pink-500', textColor: 'text-pink-50' },
+            { type: 'number', number: '8', word: 'Eight Frogs', emoji: '🐸🐸🐸🐸🐸🐸🐸🐸', sound: "Eight means this many: one, two, three, four, five, six, seven, eight frogs!", theme: 'counting', imgColor: '8BC34A', bgColor: 'bg-lime-500', textColor: 'text-lime-50' },
+            { type: 'number', number: '9', word: 'Nine Stars', emoji: '✨✨✨✨✨✨✨✨✨', sound: "Nine means this many: one, two, three, four, five, six, seven, eight, nine stars!", theme: 'counting', imgColor: '00BCD4', bgColor: 'bg-cyan-500', textColor: 'text-cyan-50' },
+            { type: 'number', number: '10', word: 'Ten Candies', emoji: '🍬🍬🍬🍬🍬🍬🍬🍬🍬🍬', sound: "Ten means this many: one, two, three, four, five, six, seven, eight, nine, ten candies!", theme: 'counting', imgColor: '9C27B0', bgColor: 'bg-purple-500', textColor: 'text-purple-50' }
+        ];
+
+        let shuffledItems = [];
+        let currentItemIndex = -1;
+        let currentItem;
+
+        // --- DOM Elements ---
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const gameArea = document.getElementById('game-area');
+        const startGameButton = document.getElementById('start-game-button');
+        const itemCard = document.getElementById('item-card'); 
+        const mainDisplay = document.getElementById('main-display'); 
+        const itemInfo = document.getElementById('item-info'); 
+        const emojiDisplay = document.getElementById('emoji-display');
+        const themeImage = document.getElementById('theme-image');
+        const nextButton = document.getElementById('next-button');
+        const audioPlayer = document.getElementById('elevenlabs-audio-player');
+        const errorMessageElement = document.getElementById('error-message');
+
+        // --- Speech Synthesis (ElevenLabs) ---
+        let speechQueue = [];
+        let isSpeaking = false; 
+        let currentAudioUrl = null; 
+
+        async function speakWithElevenLabs(text, onEndCallback) {
+            if (ELEVENLABS_API_KEY === 'YOUR_ELEVENLABS_API_KEY' || !ELEVENLABS_API_KEY) {
+                console.error("ElevenLabs API key is not set correctly.");
+                errorMessageElement.textContent = "Audio Error: API Key missing.";
+                if (onEndCallback) onEndCallback();
+                isSpeaking = false; processSpeechQueue(); return;
+            }
+            if (typeof text !== 'string' || text.trim() === '') {
+                if (onEndCallback) onEndCallback();
+                isSpeaking = false; processSpeechQueue(); return;
+            }
+
+            errorMessageElement.textContent = ""; 
+
+            if (currentAudioUrl) { URL.revokeObjectURL(currentAudioUrl); currentAudioUrl = null; }
+
+            const API_URL = `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`;
+            const payload = {
+                text: text, model_id: ELEVENLABS_MODEL_ID,
+                voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true }
+            };
+            const requestUrl = `${API_URL}?optimize_streaming_latency=1`;
+
+            const handleAudioError = (errorType, errorDetails) => {
+                console.error(`Audio Error (${errorType}):`, errorDetails);
+                let userMessage = "An audio error occurred.";
+                if (errorType === "play_rejected") {
+                    userMessage = "Audio blocked. Click again.";
+                     if (errorDetails instanceof DOMException) {
+                        console.error("Playback DOMException:", errorDetails.name, errorDetails.message);
+                    }
+                } else if (errorType === "load_error" && audioPlayer.error) { 
+                    switch (audioPlayer.error.code) {
+                        case MediaError.MEDIA_ERR_ABORTED: userMessage = 'Audio loading aborted.'; break;
+                        case MediaError.MEDIA_ERR_NETWORK: userMessage = 'Network error loading audio.'; break;
+                        case MediaError.MEDIA_ERR_DECODE: userMessage = 'Cannot decode audio.'; break;
+                        case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED: userMessage = 'Audio format not supported.'; break;
+                        default: userMessage = 'Error loading audio.';
+                    }
+                    console.error("MediaError details:", audioPlayer.error);
+                } else if (errorType === "api_error") {
+                     userMessage = `Audio API Error: ${errorDetails.message || "Unknown"}.`;
+                }
+                errorMessageElement.textContent = userMessage;
+                if (currentAudioUrl) { URL.revokeObjectURL(currentAudioUrl); currentAudioUrl = null; }
+                audioPlayer.src = ''; 
+                isSpeaking = false; 
+                if (onEndCallback) onEndCallback();
+                processSpeechQueue();
+            };
+
+            try {
+                const response = await fetch(requestUrl, {
+                    method: 'POST',
+                    headers: { 'Accept': 'audio/mpeg', 'Content-Type': 'application/json', 'xi-api-key': ELEVENLABS_API_KEY },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: "Unknown API error" }));
+                    throw new Error(errorData.detail || `API request failed status ${response.status}`);
+                }
+                const audioBlob = await response.blob();
+                currentAudioUrl = URL.createObjectURL(audioBlob); 
+                audioPlayer.src = currentAudioUrl; audioPlayer.load(); 
+                audioPlayer.onended = null; audioPlayer.onerror = null;
+                audioPlayer.onended = () => {
+                    isSpeaking = false; 
+                    if (onEndCallback) onEndCallback(); processSpeechQueue();
+                };
+                audioPlayer.onerror = (event) => handleAudioError("load_error", event);
+                const playPromise = audioPlayer.play();
+                if (playPromise !== undefined) playPromise.catch(error => handleAudioError("play_rejected", error));
+            } catch (error) { handleAudioError("api_error", {message: error.message}); }
+        }
+
+        function addToSpeechQueue(text, onEndItemCallback) {
+            speechQueue.push({ text, onEndItemCallback });
+            if (!isSpeaking) { 
+                processSpeechQueue();
+            }
+        }
+
+        function processSpeechQueue() {
+            if (speechQueue.length === 0) { 
+                isSpeaking = false; 
+                return;
+            }
+            if (isSpeaking) return; 
+            isSpeaking = true; 
+            const item = speechQueue.shift();
+            speakWithElevenLabs(item.text, item.onEndItemCallback);
+        }
+        
+        function cancelSpeech() { 
+            if (audioPlayer) {
+                audioPlayer.pause();
+                if (currentAudioUrl) { URL.revokeObjectURL(currentAudioUrl); currentAudioUrl = null; }
+                audioPlayer.src = ''; audioPlayer.onended = null; audioPlayer.onerror = null;
+            }
+            speechQueue = []; isSpeaking = false;
+        }
+        
+        // --- Sweet Treat Confetti ---
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const confettiCtx = confettiCanvas.getContext('2d');
+        let confettiAnimationId;
+        const confettiParticles = [];
+        const treatEmojis = ['🍬', '🍭', '🍫', '🍦', '🍰', '🍪', '🍩', '🥳', '🎉'];
+
+        function resizeConfettiCanvas() { confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeConfettiCanvas); resizeConfettiCanvas(); 
+
+        function createConfettiParticle() {
+            const emoji = treatEmojis[Math.floor(Math.random() * treatEmojis.length)];
+            const size = Math.random() * 20 + 25; 
+            return { 
+                emoji: emoji, x: Math.random() * confettiCanvas.width, y: -20 - Math.random() * 20, 
+                size: size, speedX: Math.random() * 6 - 3, speedY: Math.random() * 4 + 3, 
+                angle: Math.random() * Math.PI * 2, angularSpeed: (Math.random() - 0.5) * 0.1, 
+                opacity: 1, rotation: Math.random() * 360 
+            };
+        }
+
+        function drawConfetti() {
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height); 
+            let stillActive = false;
+            for (let i = confettiParticles.length - 1; i >= 0; i--) {
+                const p = confettiParticles[i]; 
+                confettiCtx.save();
+                confettiCtx.translate(p.x + p.size / 2, p.y + p.size / 2); 
+                confettiCtx.rotate(p.rotation * Math.PI / 180); 
+                confettiCtx.globalAlpha = p.opacity;
+                confettiCtx.font = `${p.size}px sans-serif`; 
+                confettiCtx.textAlign = 'center'; 
+                confettiCtx.textBaseline = 'middle'; 
+                confettiCtx.fillText(p.emoji, 0, 0); 
+                confettiCtx.restore(); 
+                p.x += p.speedX; p.y += p.speedY; p.rotation += p.angularSpeed * 10; p.opacity -= 0.008;
+                if (p.y < confettiCanvas.height && p.opacity > 0) stillActive = true; 
+                else confettiParticles.splice(i, 1);
+            }
+            if (stillActive) confettiAnimationId = requestAnimationFrame(drawConfetti);
+            else { cancelAnimationFrame(confettiAnimationId); confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height); confettiAnimationId = null; }
+        }
+
+        function triggerConfetti(duration = 3000) { 
+            const numParticles = 100; const interval = duration / numParticles; let particlesAdded = 0;
+            function addParticleBatch() {
+                if (particlesAdded >= numParticles) return; const batchSize = 5;
+                for (let i = 0; i < batchSize && particlesAdded < numParticles; i++) { confettiParticles.push(createConfettiParticle()); particlesAdded++; }
+                if (confettiParticles.length > 0 && !confettiAnimationId) drawConfetti();
+                if (particlesAdded < numParticles) setTimeout(addParticleBatch, interval * batchSize);
+            } addParticleBatch();
+        }
+
+        // --- Game Logic ---
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; }
+        }
+
+        function loadNextItem() {
+            cancelSpeech(); 
+            nextButton.disabled = true; 
+
+            currentItemIndex = (currentItemIndex + 1) % shuffledItems.length;
+            currentItem = shuffledItems[currentItemIndex];
+
+            let buttonTextColorClass = 'text-white'; 
+            const lightBackgrounds = ['yellow', 'lime', 'light-blue-400', 'pink-400', 'gray-400'];
+            if (lightBackgrounds.some(lightBg => currentItem.bgColor.includes(lightBg))) {
+                buttonTextColorClass = 'text-gray-800'; 
+            }
+
+            if (currentItem.type === 'letter') {
+                mainDisplay.textContent = currentItem.letter;
+            } else if (currentItem.type === 'number') {
+                mainDisplay.textContent = currentItem.number;
+            }
+            itemInfo.textContent = currentItem.word;
+            emojiDisplay.textContent = currentItem.emoji; 
+            themeImage.src = `https://placehold.co/300x200/${currentItem.imgColor}/FFFFFF?text=${encodeURIComponent(currentItem.word)}`;
+            themeImage.alt = `${currentItem.word} (${currentItem.theme})`;
+
+            itemCard.className = `mb-4 sm:mb-6 p-6 sm:p-8 rounded-lg shadow-lg w-full ${currentItem.bgColor} ${currentItem.textColor}`;
+            nextButton.className = `w-full mt-4 px-6 py-3 sm:py-4 ${buttonTextColorClass} text-xl sm:text-2xl font-semibold rounded-lg shadow-lg hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 ${currentItem.bgColor}`;
+            nextButton.style.setProperty('--tw-ring-color', `var(--color-${currentItem.bgColor.split('-')[1]}-400)`);
+
+            setTimeout(() => {
+                playSpeechSequenceForItem(currentItem);
+            }, 300);
+        }
+
+        function playSpeechSequenceForItem(item) {
+            cancelSpeech(); 
+
+            if (item.type === 'letter') {
+                addToSpeechQueue(`This is the letter ${item.letter}.`);
+                addToSpeechQueue(`${item.letter} is for ${item.word}! Look, a ${item.emoji}!`);
+                addToSpeechQueue(`The letter ${item.letter} makes the sound: ${item.sound}.`);
+                addToSpeechQueue(`Can you make that sound, Oliver?`, () => {
+                    nextButton.disabled = false; 
+                });
+            } else if (item.type === 'number') {
+                addToSpeechQueue(`This is the number ${item.number}.`);
+                addToSpeechQueue(`${item.number} is for ${item.word}! Look: ${item.emoji}!`);
+                addToSpeechQueue(`${item.sound}`); 
+                addToSpeechQueue(`Can you count them, Oliver?`, () => {
+                    nextButton.disabled = false; 
+                });
+            }
+        }
+
+        function startGame() {
+            welcomeScreen.classList.add('hidden');
+            gameArea.classList.remove('hidden');
+            gameArea.classList.add('flex');
+
+            shuffledItems = [...gameItems];
+            shuffleArray(shuffledItems);
+            currentItemIndex = -1; 
+            
+            addToSpeechQueue("Hi Oliver! Welcome to the Letter and Number Adventure!", () => {
+                 setTimeout(loadNextItem, 200); 
+            });
+        }
+
+        // --- Event Listeners ---
+        startGameButton.addEventListener('click', () => {
+            setTimeout(startGame, 100);
+        });
+
+        nextButton.addEventListener('click', () => {
+            cancelSpeech(); 
+            nextButton.disabled = true; 
+            triggerConfetti(3000); 
+            const positiveFeedback = ["Great job, Oliver!", "Awesome!", "Woohoo!", "You're a star!", "Fantastic!"];
+            const feedback = positiveFeedback[Math.floor(Math.random() * positiveFeedback.length)];
+            addToSpeechQueue(feedback, () => {
+                setTimeout(() => { loadNextItem(); }, 700); 
+            });
+        });
+    </script>
+</body>
+</html>
